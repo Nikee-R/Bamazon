@@ -7,7 +7,7 @@ var connection = mysql.createConnection({
     host: "localhost",
     port: 3306,
     user: "root",
-    password: "root",
+    password: "",
     database: "Bamazon"
 
 });
@@ -16,9 +16,11 @@ var connection = mysql.createConnection({
 // Connects to server.
 connection.connect(function(err) {
     if (err) throw err;
+    
     // Runs after connection is made.
     start();
 });
+
 
 // This function will prompt the user for inputs.
 function start() {
@@ -26,7 +28,7 @@ function start() {
         {
             type: 'input',
             name: 'item_id',
-            message: 'Please input item id.',
+            message: 'Please input item id:',
             validate: function(value) {
                 if (isNaN(value) === false) {
                     return true;
@@ -46,31 +48,87 @@ function start() {
             }
         }
 
-        // This part of the function will check if the item id
-        // exists and that it is in stock.
-    ]).then(function(answer) {
-        console.log("Item ID: " + answer.item_id + "\n Quantity: " + answer.quantity)
-        connection.query("SELECT * FROM  products", function(err, res) {
-            // Error handler.
+    // This part of the function will check if the item id
+    // exists and that it is in stock.
+    ]).then(function(input) {
+
+        // Variables to organize.
+        var item = input.item_id;
+        var quantity = input.quantity;
+        var queryStr = "SELECT * FROM products WHERE ?";
+
+        // This will show the product list.
+        connection.query(queryStr, {item_id: item}, function(err, res) {
             if (err) throw err;
 
-        // This organizes the table nicely.
-        console.log("   ID  |   Product Name   |  Department  |  Price  |  Stock   |");
-        // Displays all items in database.
-        for (var i = 0; i < res.length; i++) {
-        console.log(res[i].item_id + res[i].product_name + res[i].department_name + res[i].stock_quantity);
-        }
-        });
-        
-    
-        // This will put an error message based on if the item id
-        // is invalid.
+            // This will run if item ID is invalid.
+            if (res.length === 0) {
+                console.log("Sorry, this is an invalid item ID.");
+                displayInventory();
+                
+            // This part will check if the item is in stock.
+            } else {
+                var productData = res[0];
 
-        // This part will check if the item is in stock.
+                if (quantity <= productData.stock_quantity) {
+                    console.log("The product you requested is in stock.");
 
-        // This error will be thrown if there is not enough items
-        // in stock.
+                    var updateQuery = "UPDATE products SET stock_quantity = " + (productData.stock_quantity - quantity) + 
+                    " WHERE item_id = " + item;
+                
+                // Updates the data and runs if order is a success.
+                connection.query(updateQuery, function(err,res) {
+                    if (err) throw err;
 
+                    console.log("Total: " + productData.price * quantity);
+                    console.log("Thank you, your order has been place.");
+                    console.log("\n--------------------------------------\n");
 
-    });
+                    connection.end();
+                })
+
+            // This error will be thrown if there is not enough items in stock. 
+            } else {
+                console.log("Sorry, the item is not in stock.");
+                console.log("----------------------------------------------------\n");
+
+                displayInventory();
+                }
+            }
+        })
+    })
 }
+   
+    // This will display the inventory.
+    function displayInventory() {
+
+        queryStr = "SELECT * FROM products";
+
+        connection.query(queryStr, function(err, res) {
+            if (err) throw err;
+            
+            console.log("\nINVENTORY \n");
+
+            var output = "";
+            for (var i = 0; i < res.length; i++) {
+                output = "";
+                output += "Item ID: " + res[i].item_id + "|";
+                output += " Product Name: " + res[i].product_name + "|";
+                output += " Department: " + res[i].department_name + "|";
+                output += " Price: $" + res[i].price + "\n";
+
+                console.log(output);
+            }
+        
+            console.log("----------------------------------------------------\n");
+         })
+    }
+
+
+function runBamazon() {
+
+    displayInventory();
+}
+
+runBamazon();
+
